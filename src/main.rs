@@ -58,6 +58,9 @@ impl TuringMachine {
         if !accept_states.is_disjoint(&reject_states) {
             return Err("Accept and reject states must be disjoint".to_string());
         }
+        if !tape_alphabet.contains(&blank_symbol) {
+            return Err(format!("Blank symbol {} not in tape alphabet", blank_symbol));
+        }
 
         Ok(TuringMachine {
             states,
@@ -214,6 +217,26 @@ fn parse_machine_json(json_data: &MachineJson) -> Result<TuringMachine, String> 
         .as_ref()
         .and_then(|s| s.chars().next())
         .unwrap_or('_');
+
+    // Validate alphabet entries are single characters
+    for entry in &json_data.alphabet {
+        if entry.chars().count() != 1 {
+            return Err(format!(
+                "Alphabet entry '{}' must be a single character",
+                entry
+            ));
+        }
+    }
+
+    // Validate tape_alphabet entries are single characters
+    for entry in &json_data.tape_alphabet {
+        if entry.chars().count() != 1 {
+            return Err(format!(
+                "Tape alphabet entry '{}' must be a single character",
+                entry
+            ));
+        }
+    }
 
     TuringMachine::new(
         json_data.states.iter().cloned().collect(),
