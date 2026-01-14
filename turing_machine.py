@@ -73,15 +73,16 @@ class TuringMachine:
                 'halted': Whether the machine halted
         """
         # Initialize tape with input
-        tape = list(input_string) if input_string else [self.blank_symbol]
+        tape = list(input_string) if input_string else []
         head_position = 0
         current_state = self.initial_state
         steps = 0
         
         # Ensure all input symbols are valid
-        for symbol in input_string:
-            if symbol not in self.alphabet:
-                raise ValueError(f"Invalid input symbol: {symbol}")
+        if input_string:
+            for symbol in input_string:
+                if symbol not in self.alphabet:
+                    raise ValueError(f"Invalid input symbol: {symbol}")
         
         # Execute until halt or max steps
         while steps < max_steps:
@@ -183,31 +184,35 @@ def create_example_machines():
     
     # Machine 2: Accepts strings of the form 0^n 1^n (n >= 1)
     examples['equal_zeros_ones'] = TuringMachine(
-        states={'q0', 'q1', 'q2', 'q3', 'q4', 'accept', 'reject'},
+        states={'q0', 'q1', 'q2', 'q3', 'accept', 'reject'},
         alphabet={'0', '1'},
         tape_alphabet={'0', '1', 'X', 'Y', '_'},
         transitions={
-            # Start: mark first 0
-            ('q0', '0'): ('q1', 'X', 'R'),
-            ('q0', '_'): ('reject', '_', 'R'),
-            ('q0', '1'): ('reject', '1', 'R'),
+            # Start: look for next unmarked 0
+            ('q0', '0'): ('q1', 'X', 'R'),  # Mark 0 with X, look for matching 1
+            ('q0', 'X'): ('q0', 'X', 'R'),  # Skip already marked 0s
+            ('q0', 'Y'): ('q3', 'Y', 'R'),  # Found marked 1, check if done
+            ('q0', '_'): ('reject', '_', 'R'),  # Empty or all 0s
+            ('q0', '1'): ('reject', '1', 'R'),  # Unmatched 1
             
-            # Move right to find first 1
-            ('q1', '0'): ('q1', '0', 'R'),
-            ('q1', 'Y'): ('q1', 'Y', 'R'),
-            ('q1', '1'): ('q2', 'Y', 'L'),
-            ('q1', '_'): ('reject', '_', 'R'),
+            # Move right to find first unmarked 1
+            ('q1', '0'): ('q1', '0', 'R'),  # Skip 0s
+            ('q1', 'Y'): ('q1', 'Y', 'R'),  # Skip already marked 1s
+            ('q1', '1'): ('q2', 'Y', 'L'),  # Mark 1 with Y, go back
+            ('q1', '_'): ('reject', '_', 'R'),  # No matching 1
             
             # Move left back to start
             ('q2', '0'): ('q2', '0', 'L'),
             ('q2', 'Y'): ('q2', 'Y', 'L'),
-            ('q2', 'X'): ('q0', 'X', 'R'),
+            ('q2', 'X'): ('q2', 'X', 'L'),
+            ('q2', '_'): ('q0', '_', 'R'),  # Reached beginning, start over
             
-            # Check if all matched
-            ('q0', 'X'): ('q3', 'X', 'R'),
-            ('q3', 'X'): ('q3', 'X', 'R'),
-            ('q3', 'Y'): ('q3', 'Y', 'R'),
-            ('q3', '_'): ('accept', '_', 'R'),
+            # Check if all matched (should only see Ys then blank)
+            ('q3', 'Y'): ('q3', 'Y', 'R'),  # Skip marked 1s
+            ('q3', '_'): ('accept', '_', 'R'),  # All matched!
+            ('q3', '0'): ('reject', '0', 'R'),  # Extra 0s
+            ('q3', '1'): ('reject', '1', 'R'),  # Extra 1s
+            ('q3', 'X'): ('reject', 'X', 'R'),  # Shouldn't see X here
         },
         initial_state='q0',
         accept_states={'accept'},
