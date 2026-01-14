@@ -1,0 +1,17 @@
+{
+    "states": ["q0", "q1", "accept", "reject"],
+    "alphabet": ["0", "1"],
+    "tape_alphabet": ["0", "1", "_"],
+    "initial_state": "q0",
+    "accept_states": ["accept"],
+    "reject_states": ["reject"],
+    "blank_symbol": "_",
+    "transitions": {
+        "q0,0": ["q0", "0", "R"],
+        "q0,1": ["q1", "1", "R"],
+        "q0,_": ["accept", "_", "R"],
+        "q1,0": ["q1", "0", "R"],
+        "q1,1": ["q0", "1", "R"],
+        "q1,_": ["reject", "_", "R"]
+    }
+}
