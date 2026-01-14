@@ -1,1 +1,200 @@
-# turning-machine
+# Turing Machine Executor
+
+A Python implementation of a Turing machine executor that allows users to define, execute, and test Turing machines.
+
+## Features
+
+- Execute Turing machines with custom input strings
+- Determine if a machine **accepts** or **rejects** the input (holds)
+- Report the **final state** reached by the machine
+- Support for both interactive mode and file-based machine definitions
+- Built-in example machines for testing
+- JSON-based machine definition format
+
+## What is a Turing Machine?
+
+A Turing machine is a mathematical model of computation that consists of:
+- **Tape**: An infinite sequence of cells, each containing a symbol
+- **Head**: A read/write head that can move left or right on the tape
+- **States**: A finite set of states the machine can be in
+- **Transition Function**: Rules that determine the next state, what to write, and where to move based on the current state and symbol
+- **Initial State**: The starting state
+- **Accept States**: States that indicate the input is accepted
+- **Reject States**: States that indicate the input is rejected
+
+## Installation
+
+No installation required! Just clone the repository:
+
+```bash
+git clone https://github.com/vibecoding-inc/turning-machine.git
+cd turning-machine
+```
+
+## Usage
+
+### Interactive Mode
+
+Run the main program to use the interactive interface:
+
+```bash
+python3 main.py
+```
+
+The program offers several options:
+1. **Run example machine** - Test with pre-built Turing machines
+2. **Define custom machine** - Create your own machine using JSON
+3. **Load machine from file** - Load a machine definition from a JSON file
+4. **Help** - View format documentation
+5. **Exit** - Close the program
+
+### Running Examples Programmatically
+
+You can also run the example machines directly:
+
+```bash
+python3 turing_machine.py
+```
+
+This will execute several test cases on the built-in example machines.
+
+### Loading from File
+
+Example machine definitions are provided in the `examples/` directory:
+
+```bash
+# Run the interactive program and select option 3
+python3 main.py
+# Then enter: examples/even_ones.json
+```
+
+## Machine Definition Format
+
+Turing machines are defined using JSON with the following structure:
+
+```json
+{
+    "states": ["q0", "q1", "accept", "reject"],
+    "alphabet": ["0", "1"],
+    "tape_alphabet": ["0", "1", "_"],
+    "initial_state": "q0",
+    "accept_states": ["accept"],
+    "reject_states": ["reject"],
+    "blank_symbol": "_",
+    "transitions": {
+        "q0,0": ["q0", "0", "R"],
+        "q0,1": ["q1", "1", "R"],
+        "q1,_": ["accept", "_", "R"]
+    }
+}
+```
+
+### Field Descriptions
+
+- **states**: Array of all state names
+- **alphabet**: Array of input symbols (symbols that can appear in input)
+- **tape_alphabet**: Array of all symbols that can appear on tape (includes alphabet + blank + work symbols)
+- **initial_state**: Name of the starting state
+- **accept_states**: Array of accepting state names
+- **reject_states**: Array of rejecting state names
+- **blank_symbol**: Symbol representing empty tape cells (default: "_")
+- **transitions**: Object mapping state-symbol pairs to [new_state, write_symbol, direction]
+  - Key format: `"state,symbol"`
+  - Value format: `["new_state", "write_symbol", "L or R"]`
+  - Direction: `"L"` for left, `"R"` for right
+
+## Example Machines
+
+### 1. Even Number of 1s (`examples/even_ones.json`)
+
+Accepts strings with an even number of 1s (including zero).
+
+**Examples:**
+- ✓ `""` → ACCEPTS
+- ✓ `"0"` → ACCEPTS
+- ✗ `"1"` → REJECTS
+- ✓ `"11"` → ACCEPTS
+- ✗ `"111"` → REJECTS
+- ✓ `"0101"` → ACCEPTS
+
+### 2. Accept All (`examples/accept_all.json`)
+
+Accepts any string over the alphabet {0, 1}.
+
+**Examples:**
+- ✓ `""` → ACCEPTS
+- ✓ `"0"` → ACCEPTS
+- ✓ `"111"` → ACCEPTS
+- ✓ `"01010"` → ACCEPTS
+
+### 3. a⁺b⁺ (`examples/a_plus_b_plus.json`)
+
+Accepts strings of one or more 'a's followed by one or more 'b's.
+
+**Examples:**
+- ✓ `"ab"` → ACCEPTS
+- ✓ `"aabb"` → ACCEPTS
+- ✓ `"aaabbb"` → ACCEPTS
+- ✗ `"a"` → REJECTS
+- ✗ `"ba"` → REJECTS
+- ✗ `"aba"` → REJECTS
+
+## Output Interpretation
+
+When you execute a Turing machine, the program provides:
+
+1. **Accepts/Rejects**: Whether the machine accepts or rejects the input
+   - **ACCEPTS**: The machine reached an accept state (holds)
+   - **REJECTS**: The machine reached a reject state or no transition is defined
+   - **DID NOT HALT**: The machine exceeded the maximum step limit (possible infinite loop)
+
+2. **Final State**: The state the machine was in when it halted (or when it exceeded the step limit)
+
+3. **Steps**: Number of transitions executed
+
+4. **Halted**: Whether the machine successfully halted or hit the step limit
+
+## API Usage
+
+You can also use the Turing machine executor in your own Python code:
+
+```python
+from turing_machine import TuringMachine
+
+# Define a simple machine
+machine = TuringMachine(
+    states={'q0', 'accept', 'reject'},
+    alphabet={'0', '1'},
+    tape_alphabet={'0', '1', '_'},
+    transitions={
+        ('q0', '0'): ('q0', '0', 'R'),
+        ('q0', '1'): ('q0', '1', 'R'),
+        ('q0', '_'): ('accept', '_', 'R'),
+    },
+    initial_state='q0',
+    accept_states={'accept'},
+    reject_states={'reject'}
+)
+
+# Execute the machine
+result = machine.execute('0101')
+
+# Check the result
+if result['accepts']:
+    print(f"Accepted in state {result['final_state']}")
+else:
+    print(f"Rejected in state {result['final_state']}")
+```
+
+## Requirements
+
+- Python 3.6 or higher
+- No external dependencies required
+
+## Contributing
+
+Contributions are welcome! Feel free to submit issues or pull requests.
+
+## License
+
+This project is open source and available for educational purposes.

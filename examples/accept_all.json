@@ -1,0 +1,14 @@
+{
+    "states": ["q0", "accept"],
+    "alphabet": ["0", "1"],
+    "tape_alphabet": ["0", "1", "_"],
+    "initial_state": "q0",
+    "accept_states": ["accept"],
+    "reject_states": [],
+    "blank_symbol": "_",
+    "transitions": {
+        "q0,0": ["q0", "0", "R"],
+        "q0,1": ["q0", "1", "R"],
+        "q0,_": ["accept", "_", "R"]
+    }
+}
