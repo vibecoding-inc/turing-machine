@@ -351,8 +351,11 @@ impl TuringMachine {
             // State box components - dynamically sized based on state name (width = text width + 2)
             let state_width = state.len();
             // Ensure box is wide enough for accept/reject labels (8 chars: "✓ ACCEPT" or "✗ REJECT")
-            let min_width = if is_accept || is_reject { 8 } else { state_width };
-            let content_width = state_width.max(min_width);
+            let content_width = if is_accept || is_reject {
+                state_width.max(8)
+            } else {
+                state_width
+            };
             let horizontal_line = "─".repeat(content_width + 2);
             
             let box_top = format!("┌{}┐", horizontal_line);
