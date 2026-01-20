@@ -425,6 +425,61 @@ impl TuringMachine {
             }
         }
         
+        // Show transition arrows
+        println!("\n{}:", "Transition Arrows".bold());
+        
+        // Group transitions by source state
+        let mut transitions_by_source: HashMap<&String, Vec<(char, &String, char, Direction)>> = HashMap::new();
+        for ((from_state, symbol), (to_state, write_symbol, direction)) in &self.transitions {
+            transitions_by_source
+                .entry(from_state)
+                .or_insert_with(Vec::new)
+                .push((*symbol, to_state, *write_symbol, *direction));
+        }
+        
+        // Sort states for consistent display
+        let mut sorted_source_states: Vec<_> = transitions_by_source.keys().collect();
+        sorted_source_states.sort();
+        
+        for from_state in sorted_source_states {
+            let transitions = transitions_by_source.get(from_state).unwrap();
+            
+            for (symbol, to_state, write_symbol, direction) in transitions {
+                let dir_arrow = match direction {
+                    Direction::L => "←",
+                    Direction::R => "→",
+                };
+                
+                // Check if this is the next transition to be executed
+                let is_next = if let (Some(current), Some((next_sym, next_state, _, _))) = (current_state, next_transition) {
+                    from_state.as_str() == current && *symbol == next_sym && to_state.as_str() == next_state
+                } else {
+                    false
+                };
+                
+                let arrow_line = format!(
+                    "  {} --[{}: {}{}]--→ {}",
+                    from_state,
+                    symbol,
+                    write_symbol,
+                    dir_arrow,
+                    to_state
+                );
+                
+                if is_next {
+                    println!("{}", arrow_line.bold().green());
+                } else if let Some(current) = current_state {
+                    if from_state.as_str() == current {
+                        println!("{}", arrow_line.yellow());
+                    } else {
+                        println!("{}", arrow_line);
+                    }
+                } else {
+                    println!("{}", arrow_line);
+                }
+            }
+        }
+        
         // Show next transition if available
         if let (Some(current), Some((symbol, next_state, write_symbol, direction))) = (current_state, next_transition) {
             println!("\n{}:", "Next Transition".bold().green());
@@ -582,7 +637,45 @@ fn parse_machine_json(json_data: &MachineJson) -> Result<TuringMachine, String> 
     )
 }
 
-/// Create example Turing machines for testing
+/// Load example Turing machines from the examples folder
+fn load_example_machines() -> HashMap<String, (TuringMachine, String)> {
+    let mut examples = HashMap::new();
+    
+    // Try to load examples from the examples directory
+    if let Ok(entries) = fs::read_dir("examples") {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if let Some(filename) = path.file_stem().and_then(|s| s.to_str()) {
+                    if let Ok(json_str) = fs::read_to_string(&path) {
+                        if let Ok(json_data) = serde_json::from_str::<MachineJson>(&json_str) {
+                            if let Ok(machine) = parse_machine_json(&json_data) {
+                                // Create a display name from the filename
+                                let display_name = filename
+                                    .replace('_', " ")
+                                    .split_whitespace()
+                                    .map(|word| {
+                                        let mut chars = word.chars();
+                                        match chars.next() {
+                                            None => String::new(),
+                                            Some(first) => first.to_uppercase().chain(chars).collect(),
+                                        }
+                                    })
+                                    .collect::<Vec<_>>()
+                                    .join(" ");
+                                examples.insert(filename.to_string(), (machine, display_name));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    
+    examples
+}
+
+/// Create example Turing machines for testing (fallback if no examples folder)
 fn create_example_machines() -> HashMap<String, TuringMachine> {
     let mut examples = HashMap::new();
 
@@ -718,31 +811,137 @@ The program will:
 
 /// Run one of the predefined example machines
 fn run_example_machine() {
-    let examples = create_example_machines();
+    // Try to load examples from the examples folder
+    let loaded_examples = load_example_machines();
+    
+    // Prepare the examples list
+    let examples_list: Vec<(String, String)> = if loaded_examples.is_empty() {
+        let fallback = create_example_machines();
+        let mut list: Vec<(String, String)> = fallback
+            .keys()
+            .map(|key| {
+                let display_name = key.replace('_', " ")
+                    .split_whitespace()
+                    .map(|word| {
+                        let mut chars = word.chars();
+                        match chars.next() {
+                            None => String::new(),
+                            Some(first) => first.to_uppercase().chain(chars).collect(),
+                        }
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" ");
+                (key.clone(), display_name)
+            })
+            .collect();
+        list.sort_by(|a, b| a.0.cmp(&b.0));
+        list
+    } else {
+        let mut list: Vec<(String, String)> = loaded_examples
+            .iter()
+            .map(|(key, (_, display_name))| (key.clone(), display_name.clone()))
+            .collect();
+        list.sort_by(|a, b| a.0.cmp(&b.0));
+        list
+    };
 
     println!("\n{}", "=".repeat(60));
     println!("EXAMPLE MACHINES");
     println!("{}", "=".repeat(60));
-    println!("1. Even number of 1s (accepts strings with even number of 1s)");
-    println!("2. Accept all (accepts any string)");
+    
+    for (i, (_, display_name)) in examples_list.iter().enumerate() {
+        println!("{}. {}", i + 1, display_name);
+    }
+    
     println!("{}", "=".repeat(60));
 
-    print!("\nSelect example (1-2): ");
+    print!("\nSelect example (1-{}): ", examples_list.len());
     io::stdout().flush().unwrap();
     let mut choice = String::new();
     io::stdin().read_line(&mut choice).unwrap();
-    let choice = choice.trim();
-
-    let (machine_key, machine_name) = match choice {
-        "1" => ("even_ones", "Even number of 1s"),
-        "2" => ("accept_all", "Accept all strings"),
+    
+    let choice_num = match choice.trim().parse::<usize>() {
+        Ok(num) if num > 0 && num <= examples_list.len() => num,
         _ => {
             println!("Invalid choice!");
             return;
         }
     };
 
+    let (machine_key, machine_name) = &examples_list[choice_num - 1];
+    
+    // Load the machine
+    let machine = if !loaded_examples.is_empty() {
+        loaded_examples.get(machine_key).map(|(m, _)| m).unwrap()
+    } else {
+        let fallback = create_example_machines();
+        if fallback.contains_key(machine_key) {
+            // We need to load it again to avoid lifetime issues
+            // This is not ideal but works for now
+            return run_single_example(machine_key, machine_name);
+        } else {
+            println!("Machine not found!");
+            return;
+        }
+    };
+    
+    println!("\nSelected: {}", machine_name);
+    println!("{}", "-".repeat(60));
+
+    loop {
+        print!("\nEnter input string (or 'back' to return): ");
+        io::stdout().flush().unwrap();
+        let mut input_str = String::new();
+        io::stdin().read_line(&mut input_str).unwrap();
+        let input_str = input_str.trim();
+
+        if input_str.eq_ignore_ascii_case("back") {
+            break;
+        }
+
+        // Ask if user wants visual mode
+        print!("Run in visual step-by-step mode? (y/n): ");
+        io::stdout().flush().unwrap();
+        let mut visual_mode = String::new();
+        io::stdin().read_line(&mut visual_mode).unwrap();
+        let visual_mode = visual_mode.trim().eq_ignore_ascii_case("y");
+
+        if visual_mode {
+            run_visual_mode(machine, input_str);
+        } else {
+            match machine.execute(input_str, 10000) {
+                Ok(result) => {
+                    println!("\n{}", "-".repeat(60));
+                    println!("EXECUTION RESULTS");
+                    println!("{}", "-".repeat(60));
+                    println!("Input string: '{}'", input_str);
+                    println!("Steps executed: {}", result.steps);
+                    println!("Final state: {}", result.final_state);
+                    println!("Machine halted: {}", result.halted);
+
+                    if let Some(true) = result.accepts {
+                        println!(
+                            "\n✓ RESULT: ACCEPTS (halts in state {})",
+                            result.final_state
+                        );
+                    } else if let Some(false) = result.accepts {
+                        println!("\n✗ RESULT: REJECTS (final state: {})", result.final_state);
+                    } else {
+                        println!("\n? RESULT: DID NOT HALT (possible infinite loop)");
+                    }
+                    println!("{}", "-".repeat(60));
+                }
+                Err(e) => println!("Error: {}", e),
+            }
+        }
+    }
+}
+
+/// Run a single example machine (helper for fallback case)
+fn run_single_example(machine_key: &str, machine_name: &str) {
+    let examples = create_example_machines();
     let machine = examples.get(machine_key).unwrap();
+    
     println!("\nSelected: {}", machine_name);
     println!("{}", "-".repeat(60));
 
@@ -1125,52 +1324,86 @@ fn run_visual_mode(machine: &TuringMachine, input_str: &str) {
 fn run_examples() {
     println!("Turing Machine Executor - Examples\n");
 
-    let examples = create_example_machines();
-
-    // Test even ones machine
-    println!("{}", "=".repeat(60));
-    println!("Machine: Even number of 1s");
-    println!("{}", "=".repeat(60));
-
-    let machine = examples.get("even_ones").unwrap();
-    let test_cases = ["", "0", "1", "11", "101", "111", "0101", "1111"];
-
-    for test in &test_cases {
-        let result = machine.execute(test, 10000).unwrap();
-        print!("Input: '{}' -> ", test);
-        if let Some(true) = result.accepts {
-            println!(
-                "ACCEPTS (state: {}, steps: {})",
-                result.final_state, result.steps
-            );
-        } else {
-            println!(
-                "REJECTS (state: {}, steps: {})",
-                result.final_state, result.steps
-            );
+    // Try to load examples from the examples folder
+    let loaded_examples = load_example_machines();
+    
+    if !loaded_examples.is_empty() {
+        // Run all loaded examples
+        for (key, (machine, display_name)) in &loaded_examples {
+            println!("{}", "=".repeat(60));
+            println!("Machine: {}", display_name);
+            println!("File: examples/{}.json", key);
+            println!("{}", "=".repeat(60));
+            
+            // Run the machine with empty input as a basic test
+            match machine.execute("", 10000) {
+                Ok(result) => {
+                    print!("Input: '' -> ");
+                    if let Some(true) = result.accepts {
+                        println!(
+                            "ACCEPTS (state: {}, steps: {})",
+                            result.final_state, result.steps
+                        );
+                    } else {
+                        println!(
+                            "REJECTS (state: {}, steps: {})",
+                            result.final_state, result.steps
+                        );
+                    }
+                }
+                Err(e) => println!("Error: {}", e),
+            }
+            println!();
         }
-    }
+    } else {
+        // Fallback to hardcoded examples
+        let examples = create_example_machines();
 
-    println!("\n{}", "=".repeat(60));
-    println!("Machine: Accept all strings");
-    println!("{}", "=".repeat(60));
+        // Test even ones machine
+        println!("{}", "=".repeat(60));
+        println!("Machine: Even number of 1s");
+        println!("{}", "=".repeat(60));
 
-    let machine = examples.get("accept_all").unwrap();
-    let test_cases = ["", "ab", "01010", "111"];
+        let machine = examples.get("even_ones").unwrap();
+        let test_cases = ["", "0", "1", "11", "101", "111", "0101", "1111"];
 
-    for test in &test_cases {
-        let result = machine.execute(test, 10000).unwrap();
-        print!("Input: '{}' -> ", test);
-        if let Some(true) = result.accepts {
-            println!(
-                "ACCEPTS (state: {}, steps: {})",
-                result.final_state, result.steps
-            );
-        } else {
-            println!(
-                "REJECTS (state: {}, steps: {})",
-                result.final_state, result.steps
-            );
+        for test in &test_cases {
+            let result = machine.execute(test, 10000).unwrap();
+            print!("Input: '{}' -> ", test);
+            if let Some(true) = result.accepts {
+                println!(
+                    "ACCEPTS (state: {}, steps: {})",
+                    result.final_state, result.steps
+                );
+            } else {
+                println!(
+                    "REJECTS (state: {}, steps: {})",
+                    result.final_state, result.steps
+                );
+            }
+        }
+
+        println!("\n{}", "=".repeat(60));
+        println!("Machine: Accept all strings");
+        println!("{}", "=".repeat(60));
+
+        let machine = examples.get("accept_all").unwrap();
+        let test_cases = ["", "ab", "01010", "111"];
+
+        for test in &test_cases {
+            let result = machine.execute(test, 10000).unwrap();
+            print!("Input: '{}' -> ", test);
+            if let Some(true) = result.accepts {
+                println!(
+                    "ACCEPTS (state: {}, steps: {})",
+                    result.final_state, result.steps
+                );
+            } else {
+                println!(
+                    "REJECTS (state: {}, steps: {})",
+                    result.final_state, result.steps
+                );
+            }
         }
     }
 }
