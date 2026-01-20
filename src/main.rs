@@ -348,17 +348,26 @@ impl TuringMachine {
             let is_accept = self.accept_states.contains(*state);
             let is_reject = self.reject_states.contains(*state);
             
-            // State box components
-            let box_top = "┌──────────┐";
-            let state_line = format!("│ {:^8} │", state.as_str());
-            let type_line = if is_accept {
-                "│ ✓ ACCEPT │"
-            } else if is_reject {
-                "│ ✗ REJECT │"
+            // State box components - dynamically sized based on state name (width = text width + 2)
+            let state_width = state.len();
+            // Ensure box is wide enough for accept/reject labels (8 chars: "✓ ACCEPT" or "✗ REJECT")
+            let content_width = if is_accept || is_reject {
+                state_width.max(8)
             } else {
-                "│          │"
+                state_width
             };
-            let box_bottom = "└──────────┘";
+            let horizontal_line = "─".repeat(content_width + 2);
+            
+            let box_top = format!("┌{}┐", horizontal_line);
+            let state_line = format!("│ {:^width$} │", state.as_str(), width = content_width);
+            let type_line = if is_accept {
+                format!("│ {:^width$} │", "✓ ACCEPT", width = content_width)
+            } else if is_reject {
+                format!("│ {:^width$} │", "✗ REJECT", width = content_width)
+            } else {
+                format!("│ {} │", " ".repeat(content_width))
+            };
+            let box_bottom = format!("└{}┘", horizontal_line);
             
             // Print state box
             if is_current {
@@ -409,8 +418,9 @@ impl TuringMachine {
                         false
                     };
                     
-                    let arrow = format!("      │ {} --[{}:{}{}]-->  {}", 
-                        state.as_str(), symbol, write_symbol, dir_arrow, to_state);
+                    // Arrow from current state (box above) to target state
+                    let arrow = format!("      │ --[{}:{}{}]--> {}", 
+                        symbol, write_symbol, dir_arrow, to_state);
                     
                     if is_next {
                         println!("{}", arrow.bold().green());
@@ -419,8 +429,17 @@ impl TuringMachine {
                     } else {
                         println!("{}", arrow);
                     }
+                    
+                    // Add visual pointer to target state box
+                    let pointer = format!("      │              ↓");
+                    if is_next {
+                        println!("{}", pointer.bold().green());
+                    } else if is_current {
+                        println!("{}", pointer.yellow());
+                    } else {
+                        println!("{}", pointer);
+                    }
                 }
-                println!("      ↓");
             }
             
             if i < sorted_states.len() - 1 {
